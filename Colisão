@@ -1,0 +1,54 @@
+# Teste colisão
+import vpython as vp
+import numpy as np
+
+
+def col(i, j):  # para colisão entre esfera s[i] e esfera s[j]
+    m1, m2 = m[i], m[j]  # massas das eferas envolvidas
+    v1f = (m1-m2)/(m1+m2)*v1i + 2*m2/(m1+m2)*v2i  # encontrando v1f
+    v2f = 2*m1/(m1+m2)*v1i + (m2-m1)/(m1+m2)*v2i  # encontrando v2f
+    delta1 = abs(v1f - v1i)
+    delta2 = abs(v2f - v2i)
+    vel[i] = vel[i] + delta1*r  # atualiza velocidade da esfera i
+    vel[j] = vel[j] - delta2*r  # atualiza velocidade da esfera j
+
+
+# s é array das esferas
+# vel é array dos vetores velocidade
+# m é array das massas
+
+
+# testar com duas esferas
+
+N = 2  # número de esferas
+raio = 1
+s = np.array([vp.sphere(pos=vp.vector(-4, 1, 0)), vp.sphere(pos=vp.vector(0, 0, 0))])
+vel = np.array([vp.vector(1, 0, 0), vp.vector(0.2, 0, 0)], vp.vector)
+m = np.ones(N)
+
+tf = 5  # tempo da animação
+fps = 300
+h = 1/fps  # tamanho do passo temporal
+tpoints = np.arange(0, tf, h)
+
+
+vp.canvas(height=1000, width=1000)
+
+# animação
+for t in tpoints:
+    vp.rate(fps)
+    # para cada par de esferas, testar se elas colidem ou não
+    for k in range(N):
+        for l in range(k+1, N):  # evita repetição
+            R = s[k].pos - s[l].pos  # vetor do centro de s[l] ao centro de s[k]
+            r = vp.hat(R)  # versor na direção de R
+            v1i = vp.dot(r, vel[k])  # componente radial da velocidade de s[k]
+            v2i = vp.dot(r, vel[l])  # componente radial da velocidade de s[l]
+            if vp.mag(R)<=2*raio:
+                # condições para impedir que o impulso seja aplicado mais de uma vez:
+                if v1i<=0 and v2i>=0:  # esferas colidem se estiverem viajando em direções contrárias em r
+                    col(k, l)
+                elif v1i*v2i>0 and v2i>v1i:  # viajando na mesma direção e a que está "atrás" é mais rápida
+                    col(k, l)
+    for i in range(N):  # após atualizar todas as velocidades, podemos atualizar a posição
+        s[i].pos += vel[i]*h
