@@ -1,0 +1,50 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.optimize import curve_fit
+plt.style.use(['science', 'notebook', 'grid'])
+
+
+def model_f(x, a):
+    return a*x
+
+
+tf = 300  # tempo da animação
+fps = 30
+h = 1/fps  # tamanho do passo temporal
+t = np.arange(0, tf, h)  # para plotar dados
+t_model = np.array([0, tf])  # para plotar fit linear (necessita 2 pontos apenas)
+
+T_list = [5, 100, 200, 300]  # lista de temperaturas para as quais obtivemos dados
+data = []  # lista com arrays de dados (valor médio de r^2)
+angular = []  # lista com coeficientes angulares das retas obtidas por ajuste linear
+err_angular = []  # lista com erros dos coeficientes angulares
+color = ['blue', 'red', 'green', 'black']  # cores para o gráfico
+
+for i, T in enumerate(T_list):  # para cada temperatura
+    data.append(np.loadtxt(f'r2 - T={T}K', delimiter=','))  # carregar dados
+    plt.plot(t, data[i], label=f'$T={T}K$', color=color[i])   # plotar
+    popt, pcov = curve_fit(model_f, t, data[i], p0=2e-4)    # ajuste linear
+    a = popt[0]                                             # inclinação da reta (coef. angular)
+    angular.append(a)
+    err_angular.append(pcov[0, 0])
+    y_model = model_f(t, a)                                 # pontos para plotar o ajuste linear
+    plt.plot(t, y_model, '--', color=color[i])              # plotar o ajuste
+
+# Gráfico da média de r^2 em função do tempo, para cada temperatura
+plt.xlim(0, tf)
+plt.ylim(0, 0.04)
+plt.xlabel('Tempo [$s$]')
+plt.ylabel('$\overline{r^2}$ [$m^2$]')
+plt.legend(fancybox=False, edgecolor='black')
+plt.title('Dependência de $\overline{r^2}$ com o tempo para cada temperatura')
+plt.show()
+
+# Gráfico das inclinações das retas em função das respectivas temperaturas
+angular = np.array(angular)*1e5  # mudar a escala para legenda ficar mais legível
+plt.errorbar(T_list, angular, yerr=err_angular, fmt='o', color='r')
+plt.xlim(0, 305)
+plt.ylim(0, 14)
+plt.xlabel('Temperatura [K]')
+plt.ylabel('Inclinação [$10^{-5}m^2/s$]')
+plt.title('Dependência da inclinação da reta com a temperatura')
+plt.show()
