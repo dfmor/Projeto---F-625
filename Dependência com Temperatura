@@ -1,0 +1,132 @@
+import numpy as np
+import random as rd
+from numpy.linalg import norm
+import vpython as vp
+from scipy.constants import k as kb
+
+# DESCONSIDERANDO COLISÕES ENTRE ESFERAS PEQUENAS
+
+# pos é o array das posições
+# vel é array dos vetores velocidade
+# radius é o array dos raios
+
+
+def wall(cv, q):  # para colisão da esfera q com as paredes (canvas cv)
+    # testa se a esfera colide com alguma parede
+    # caso houver colisão, atualiza a velocidade
+    xq, yq, zq = pos[cv, q, 0], pos[cv, q, 1], pos[cv, q, 2]
+    vx, vy, vz = vel[cv, q, 0], vel[cv, q, 1], vel[cv, q, 2]
+    p = radius[q]
+    # testando colisão com as paredes em x=-L/2 e x=L/2
+    if xq <= -L/2 + p and vx < 0:
+        vel[cv, q, 0] += 2 * abs(vx)
+    elif xq >= L/2 - p and vx > 0:
+        vel[cv, q, 0] -= 2 * abs(vx)
+    # testando colisão com as paredes em y=-L/2 e y=L/2
+    if yq <= -L/2 + p and vy < 0:
+        vel[cv, q, 1] += 2 * abs(vy)
+    elif yq >= L/2 - p and vy > 0:
+        vel[cv, q, 1] -= 2 * abs(vy)
+    # testando colisão com as paredes em z=-L/2 e z=L/2
+    if zq <= -L/2 + p and vz < 0:
+        vel[cv, q, 2] += 2 * abs(vz)
+    elif zq >= L/2 - p and vz > 0:
+        vel[cv, q, 2] -= 2 * abs(vz)
+
+
+def col(cv, i):  # para colisão entre a esfera s[i] e a esfera grande (canvas cv)
+    m1, m2 = massa, MASSA  # massas das eferas envolvidas
+    v1f = (m1-m2)/(m1+m2)*v1i + 2*m2/(m1+m2)*v2i  # encontrando v1f
+    v2f = 2*m1/(m1+m2)*v1i + (m2-m1)/(m1+m2)*v2i  # encontrando v2f
+    delta1 = abs(v1f - v1i)
+    delta2 = abs(v2f - v2i)
+    vel[cv, i] = vel[cv, i] + delta1*r      # atualiza velocidade da esfera i
+    vel[cv, N-1] = vel[cv, N-1] - delta2*r  # atualiza velocidade da esfera grande
+
+
+# criar arrays com esferas e outros dados
+N = 300  # número de esferas
+L = 1  # lado da caixa cúbica
+
+raio = L/70.0
+RAIO = L/7.0
+
+massa = 5.32e-23   # Massa de uma molécula de O₂
+MASSA = massa*5e2  # Massa da partícula em suspensão
+
+radius = np.ones(N)*raio
+pos = np.zeros([4, N, 3], float)
+vel = np.zeros([4, N, 3], float)
+# Para a esfera maior:
+radius[N-1] = RAIO
+
+tf = 1000  # tempo da animação
+fps = 30
+h = 1/fps  # tamanho do passo temporal
+tpoints = np.arange(0, tf, h)
+
+T_list = np.array([5, 100, 200, 300])  # Temperatura do sistema em K
+
+c1 = vp.canvas(align='left', height=300, width=480)
+c2 = vp.canvas(algin='right', height=300, width=480)
+c3 = vp.canvas(align='left', height=300, width=480)
+c4 = vp.canvas(algin='right', height=300, width=480)
+
+c_list = [c1, c2, c3, c4]
+
+for j, T in enumerate(T_list):
+    vp.label(canvas=c_list[j], text=f'T = {T} K', pixel_pos=True, pos=vp.vector(40, 280, 0))
+
+v = np.sqrt(3*kb*T_list/massa)/10  # Array dos módulos das velocidades (pelo teorema da equipartição)
+
+for j, c in enumerate(c_list):
+    # atribuindo velocidades e posições
+    for w in range(N-1):  # Não inclui a esfera grande, de forma que sua posição e sua velocidade continuam nulas
+        # Defina o sentido da velocidade de cada partícula de forma aleatória
+        vel[j, w] = np.array([rd.uniform(-1, 1), rd.uniform(-1, 1), rd.uniform(-1, 1)])
+        # Normalize o vetor anterior e multiplique pelo módulo desejado para ter o valor correto da velocidade
+        vel[j, w] *= v[j]/norm(vel[j, w])
+        # Defina aleatoriamente a posição da partícula w na caixa
+        pos[j, w] = np.array([rd.uniform(-L/2, L/2), rd.uniform(-L/2, L/2), rd.uniform(-L/2, L/2)])
+        while norm(pos[j, w]) <= (RAIO+raio):
+            pos[j, w] = np.array([rd.uniform(-L/2, L/2), rd.uniform(-L/2, L/2), rd.uniform(-L/2, L/2)])
+
+
+# Array das esferas para animação:
+s = np.empty([4, N], vp.sphere)
+
+# Colocando todas as esferas nas suas devidas posições
+for j, c in enumerate(c_list):
+    for k in range(N):
+        s[j, k] = vp.sphere(canvas=c, pos=vp.vector(pos[j, k, 0], pos[j, k, 1], pos[j, k, 2]), radius=radius[k])
+    s[j, N-1].color = vp.color.yellow  # Esfera maior será amarela
+    vp.attach_trail(s[j, N-1], color=vp.color.yellow)  # torna visível a trajetória da esfera grande
+
+for t in tpoints:
+    vp.rate(fps)  # define velocidade da animação
+    for j, c in enumerate(c_list):  # Para cada canvas, encontrar as novas velocidades
+        # para cada esfera pequena, testar se ela colide com a grande
+        for k in range(N):
+            if k != N-1:
+                dmin = raio + RAIO  # distância em que ocorre colisão
+                r = pos[j, k] - pos[j, N-1]
+                R = norm(r)
+                r /= R  # versor apontando do centro de k ao centro da esfera grande
+                v1i = np.dot(r, vel[j, k])    # componente radial da velocidade de s[k]
+                v2i = np.dot(r, vel[j, N-1])  # componente radial da velocidade de s[l]
+                if R <= dmin:  # atualizar velocidades quando houver colisão
+                    # outras condições são necessárias para impedir que o impulso seja aplicado mais de uma vez
+                    if v1i <= 0 <= v2i:  # esferas colidem se estiverem viajando em direções contrárias em r
+                        col(j, k)
+                    elif v1i*v2i > 0 and v2i > v1i:  # viajando na mesma direção e a que está "atrás" é mais rápida
+                        col(j, k)
+
+            wall(j, k)  # atualiza velocidade se houver colisão com parede
+
+    # após atualizar todas as velocidades, podemos atualizar as posições para todos os canvases
+    pos += vel*h
+
+    # Atualizar animações
+    for j, c in enumerate(c_list):
+        for k in range(N):
+            s[j, k].pos = vp.vector(pos[j, k, 0], pos[j, k, 1], pos[j, k, 2])
